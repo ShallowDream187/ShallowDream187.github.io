@@ -279,6 +279,47 @@
         .btn.secondary:hover {
             background-color: #757575;
         }
+        /* 文本截断和提示样式 */
+        .truncated-text {
+            max-width: 150px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            position: relative;
+        }
+        
+        .truncated-text:hover::after {
+            content: attr(data-full-text);
+            position: absolute;
+            left: 0;
+            top: 100%;
+            white-space: normal;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 8px;
+            border-radius: 4px;
+            z-index: 1000;
+            max-width: 300px;
+            word-wrap: break-word;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            font-size: 12px;
+        }
+        
+        /* 给图表相关元素应用截断样式 */
+        .echarts-tooltip-item, .echarts-tooltip-title {
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* 图例和标签文本截断 */
+        .chart-legend-item, .chart-label {
+            max-width: 120px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
     </style>
 </head>
 <body>
@@ -572,7 +613,20 @@
                 // 创建单元格
                 for (let j = 0; j < data[i].length; j++) {
                     const cell = i === 0 ? document.createElement('th') : document.createElement('td');
-                    cell.textContent = data[i][j];
+                    const content = data[i][j];
+                    
+                    // 对长内容进行处理
+                    if (content && content.toString().length > 20) {
+                        // 创建带有截断和提示功能的容器
+                        const container = document.createElement('div');
+                        container.className = 'truncated-text';
+                        container.setAttribute('data-full-text', content);
+                        container.textContent = truncateText(content, 20);
+                        cell.appendChild(container);
+                    } else {
+                        cell.textContent = content;
+                    }
+                    
                     row.appendChild(cell);
                 }
                 
@@ -831,6 +885,14 @@
             return { categories: mergedCategories, values: mergedValues };
         }
         
+        // 辅助函数：截断长文本
+        function truncateText(text, maxLength = 12) {
+            if (text && text.length > maxLength) {
+                return text.substring(0, maxLength) + '...';
+            }
+            return text;
+        }
+        
         // 生成柱状图
         function generateBarChart(categories, values) {
             const chartDom = document.getElementById('bar-chart');
@@ -853,6 +915,20 @@
             const xAxisName = headers[categoryColumnIndex] || 'X轴';
             const yAxisName = headers[valueColumnIndex] || 'Y轴';
             
+            // 准备数据，添加原始名称
+            const seriesData = mergedValues.map((value, index) => {
+                return {
+                    value: value,
+                    itemStyle: {
+                        color: colorList[index % colorList.length]
+                    },
+                    originalName: mergedCategories[index] // 存储原始名称
+                };
+            });
+            
+            // 截断X轴类别名称
+            const axisLabels = mergedCategories.map(cat => truncateText(cat, 10));
+            
             const option = {
                 title: {
                     text: '数据分析结果',
@@ -868,19 +944,21 @@
                     },
                     formatter: function(params) {
                         const param = params[0];
-                        return `${param.name}: ${param.value} ${yAxisName}`;
-                    }
+                        // 使用原始名称
+                        return `${param.data.originalName}: ${param.value} ${yAxisName}`;
+                    },
+                    confine: true
                 },
                 grid: {
                     left: '5%',
-                    right: '10%',  // 增加右侧空间，为Y轴名称留出位置
-                    bottom: '10%',
+                    right: '10%',
+                    bottom: '15%', // 增加底部空间，避免长标签被截断
                     top: '15%',
                     containLabel: true
                 },
                 xAxis: {
                     type: 'category',
-                    data: mergedCategories,
+                    data: axisLabels, // 使用截断后的标签
                     axisLabel: {
                         rotate: 45,
                         interval: 0,
@@ -896,7 +974,7 @@
                         }
                     },
                     name: xAxisName,
-                    nameLocation: 'end',  // 修改为末端显示
+                    nameLocation: 'end',
                     nameGap: 5,
                     nameTextStyle: {
                         fontWeight: 'bold',
@@ -920,25 +998,18 @@
                         }
                     },
                     name: yAxisName,
-                    nameLocation: 'end',  // 修改为末端显示
+                    nameLocation: 'end',
                     nameGap: 15,
                     nameTextStyle: {
                         fontWeight: 'bold',
                         fontSize: 12,
-                        padding: [0, 0, 5, 0]  // 上右下左的内边距
+                        padding: [0, 0, 5, 0]
                     }
                 },
                 series: [{
                     name: yAxisName,
                     type: 'bar',
-                    data: mergedValues.map((value, index) => {
-                        return {
-                            value: value,
-                            itemStyle: {
-                                color: colorList[index % colorList.length]
-                            }
-                        };
-                    }),
+                    data: seriesData,
                     barWidth: '50%',
                     itemStyle: {
                         borderRadius: [5, 5, 0, 0]
@@ -965,6 +1036,21 @@
             
             myChart.setOption(option);
             
+            // 添加X轴标签悬停交互
+            myChart.getZr().on('mousemove', function(event) {
+                const pointInPixel = [event.offsetX, event.offsetY];
+                if (myChart.containPixel('grid', pointInPixel)) {
+                    const xIndex = myChart.convertFromPixel({seriesIndex: 0}, pointInPixel)[0];
+                    if (xIndex >= 0 && xIndex < mergedCategories.length) {
+                        // 显示完整名称的提示
+                        myChart.setTooltip({
+                            position: pointInPixel,
+                            content: mergedCategories[xIndex]
+                        });
+                    }
+                }
+            });
+            
             // 窗口大小变化时重绘图表
             window.addEventListener('resize', function() {
                 myChart.resize();
@@ -976,19 +1062,44 @@
             const chartDom = document.getElementById('pie-chart');
             const myChart = echarts.init(chartDom);
             
-            // 使用修改后的函数合并数据
-            const mergedData = mergeData(categories, values);
-            const mergedCategories = mergedData.categories;
-            const mergedValues = mergedData.values;
+            // 首先收集唯一的类别以及每个类别出现的次数
+            const categoryCountMap = new Map();
+            
+            for (let i = 0; i < categories.length; i++) {
+                const category = categories[i];
+                // 如果是饼图，我们只计算每个类别出现的次数，而不是数值乘积
+                if (categoryCountMap.has(category)) {
+                    categoryCountMap.set(category, categoryCountMap.get(category) + 1);
+                } else {
+                    categoryCountMap.set(category, 1);
+                }
+            }
             
             // 将数据转换为饼图格式
-            const pieData = mergedCategories.map((name, index) => {
-                return { name, value: mergedValues[index] };
+            const pieData = [];
+            const total = categories.length; // 总条目数
+            
+            categoryCountMap.forEach((count, name) => {
+                pieData.push({
+                    name: name,
+                    value: count,
+                    percentage: ((count / total) * 100).toFixed(1), // 计算百分比
+                    // 存储原始名称，用于tooltip显示
+                    originalName: name
+                });
             });
             
             // 获取列标签作为数据名称
             const categoryColumnIndex = parseInt(document.getElementById('category-column').value);
             const categoryName = headers[categoryColumnIndex] || '数据';
+            
+            // 截断长文本的函数
+            function truncateText(text, maxLength = 12) {
+                if (text && text.length > maxLength) {
+                    return text.substring(0, maxLength) + '...';
+                }
+                return text;
+            }
             
             const option = {
                 title: {
@@ -1001,17 +1112,35 @@
                 },
                 tooltip: {
                     trigger: 'item',
-                    formatter: '{a} <br/>{b}: {c} ({d}%)'
+                    formatter: function(params) {
+                        // 显示完整的类别名称、计数和百分比
+                        return `${params.data.originalName}: ${params.data.value}条 (${params.data.percentage}%)`;
+                    },
+                    confine: true // 确保tooltip不会超出画布边界
                 },
                 legend: {
+                    type: 'scroll',
                     orient: 'vertical',
-                    left: 'left',
-                    type: 'scroll'
+                    left: 10,
+                    top: 20,
+                    bottom: 20,
+                    formatter: function(name) {
+                        // 图例中的文本也进行截断
+                        return truncateText(name, 15);
+                    },
+                    tooltip: {
+                        show: true,
+                        formatter: function(params) {
+                            // 当鼠标悬停在图例上时显示完整名称
+                            return params.name;
+                        }
+                    }
                 },
                 series: [{
                     name: categoryName,
                     type: 'pie',
                     radius: '60%',
+                    center: ['60%', '50%'], // 调整饼图位置，为左侧图例留出空间
                     data: pieData,
                     emphasis: {
                         itemStyle: {
@@ -1021,12 +1150,30 @@
                         }
                     },
                     label: {
-                        formatter: '{b}: {c} ({d}%)'
+                        formatter: function(params) {
+                            // 饼图标签截断文本
+                            return truncateText(params.name) + ': ' + params.value + '条 (' + params.percent + '%)';
+                        },
+                        overflow: 'truncate',
+                        width: 120
                     }
                 }]
             };
             
             myChart.setOption(option);
+            
+            // 添加图例悬停交互
+            myChart.on('legendselectchanged', function(params) {
+                // 这里我们不做任何操作，只是为了阻止默认的图例点击行为
+                // 防止用户误点击图例导致数据消失
+                myChart.setOption({
+                    legend: {
+                        selected: {
+                            [params.name]: true
+                        }
+                    }
+                });
+            });
             
             window.addEventListener('resize', function() {
                 myChart.resize();
