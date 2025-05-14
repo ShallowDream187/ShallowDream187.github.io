@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel数据可视化</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .upload-area {
+            border: 2px dashed #2196F3;
+            border-radius: 8px;
+            padding: 50px 20px;
+            margin: 20px auto;
+            max-width: 800px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            background-color: #f9f9f9;
+        }
+        .folder-icon {
+            font-size: 50px;
+            color: #FFC107;
+            margin-bottom: 20px;
+        }
+        .charts-options {
+            margin: 20px 0;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            display: none;
+        }
+        .chart-selection {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .chart-option {
+            padding: 15px 20px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background-color: #f9f9f9;
+            min-width: 120px;
+            text-align: center;
+            position: relative;
+        }
+        .chart-option:hover {
+            background-color: #e3f2fd;
+            border-color: #2196F3;
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .chart-option.selected {
+            background-color: #2196F3;
+            color: white;
+            border-color: #0b7dda;
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(33,150,243,0.3);
+        }
+        .chart-option i {
+            display: block;
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        .selection-help {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+            border-radius: 4px;
+        }
+        .charts-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        .chart-box {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            width: calc(100% - 30px);
+            min-height: 400px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .chart {
+            width: 100%;
+            height: 400px;
+        }
+        .btn {
+            background-color: #2196F3;
+            border: none;
+            color: white;
+            padding: 12px 25px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 15px 5px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background-color: #0b7dda;
+        }
+        .btn:disabled {
+            background-color: #2196F3;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        .btn.secondary {
+            background-color: #4CAF50;
+        }
+        .btn.secondary:hover {
+            background-color: #45a049;
+        }
+        .btn.secondary.active {
+            background-color: #4CAF50;
+            transform: scale(1.05);
+            transition: all 0.3s;
+        }
+        .btn.secondary:disabled {
+            background-color: #9e9e9e;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        .file-input {
+            display: none;
+        }
+        .upload-text {
+            margin-top: 15px;
+            color: #666;
+            font-size: 14px;
+        }
+        .data-preview {
+            margin-top: 30px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+        .column-selector {
+            margin: 20px 0;
+            display: none;
+        }
+        .column-group {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .column-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        #file-name {
+            margin-top: 10px;
+            font-style: italic;
+            color: #666;
+        }
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        .step {
+            padding: 10px 20px;
+            margin: 0 5px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            color: #333;
+        }
+        .step.active {
+            background-color: #2196F3;
+            color: white;
+        }
+        .error-msg {
+            color: #f44336;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 4px;
+            display: none;
+        }
+        .flash-notice {
+            background-color: #ffeb3b;
+            color: #000;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: bold;
+            opacity: 0.9;
+            border: 2px dashed #ff9800;
+        }
+        .flash {
+            animation: flashAnimation 1.5s ease-in-out 2;
+        }
+        @keyframes flashAnimation {
+            0% { opacity: 0.9; }
+            50% { opacity: 0.3; }
+            100% { opacity: 0.9; }
+        }
+        .selection-help {
+            background-color: #e3f2fd;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border-left: 4px solid #2196F3;
+        }
+        
+        .column-description {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        
+        .column-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            align-items: center;
+        }
+        
+        .btn.secondary {
+            background-color: #9e9e9e;
+        }
+        
+        .btn.secondary:hover {
+            background-color: #757575;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Excel数据可视化</h1>
+    </div>
+
+    <div class="step-indicator">
+        <div class="step active">1. 上传Excel</div>
+        <div class="step">2. 选择图表类型</div>
+        <div class="step">3. 选择数据列</div>
+        <div class="step">4. 查看结果</div>
+    </div>
+
+    <div class="upload-container" id="upload-container">
+        <div class="upload-area" id="upload-area">
+            <div class="folder-icon">📁</div>
+            <h2>选择Excel文件</h2>
+            <p class="upload-text">支持.xlsx和.xls格式文件</p>
+            <p class="upload-text">点击选择或拖放文件到此处</p>
+            <input type="file" id="file-upload" class="file-input" accept=".xlsx, .xls">
+        </div>
+        <div id="file-name"></div>
+        <div class="error-msg" id="error-msg"></div>
+    </div>
+
+    <div class="data-preview" id="data-preview">
+        <h3>数据预览</h3>
+        <div id="preview-table"></div>
+    </div>
+
+    <div class="charts-options" id="charts-options">
+        <h3>请选择要生成的图表类型</h3>
+        <div class="selection-help">点击下方图表类型进行选择（可多选），然后点击"继续"按钮</div>
+        <div class="chart-selection">
+            <div class="chart-option" data-type="bar">
+                <i>📊</i>
+                柱状图
+            </div>
+            <div class="chart-option" data-type="pie">
+                <i>🥧</i>
+                饼图
+            </div>
+            <div class="chart-option" data-type="line">
+                <i>📈</i>
+                折线图
+            </div>
+            <div class="chart-option" data-type="scatter">
+                <i>🔢</i>
+                散点图
+            </div>
+            <div class="chart-option" data-type="radar">
+                <i>📡</i>
+                雷达图
+            </div>
+            <div class="chart-option" data-type="area">
+                <i>📉</i>
+                面积图
+            </div>
+            <div class="chart-option" data-type="sunburst">
+                <i>☀️</i>
+                旭日图
+            </div>
+        </div>
+        <button id="continue-to-columns-btn" class="btn secondary">继续</button>
+    </div>
+
+    <div class="column-selector" id="column-selector">
+        <h3>选择数据列</h3>
+        
+        <div class="selection-help">
+            请选择要用于图表的数据列。对于柱状图、折线图和散点图，需要选择X轴和Y轴的数据；对于饼图，只需选择一列数据。
+        </div>
+        
+        <div class="column-group">
+            <label id="category-label" for="category-column">X轴数据列（类别/名称）:</label>
+            <select id="category-column" class="column-select"></select>
+            <div class="column-description">X轴通常用于显示类别名称，如产品、日期、地区等</div>
+        </div>
+        
+        <div class="column-group" id="value-column-group">
+            <label for="value-column">Y轴数据列（数值）:</label>
+            <select id="value-column" class="column-select"></select>
+            <div class="column-description">Y轴通常用于显示数值，如销售额、数量、比率等</div>
+        </div>
+        
+        <div class="column-actions">
+            <button id="swap-axes-btn" class="btn secondary" title="交换X轴和Y轴数据">
+                <span>↔️ 交换XY轴</span>
+            </button>
+            <button id="generate-btn" class="btn">生成图表</button>
+        </div>
+    </div>
+
+    <div class="charts-container" id="charts-container">
+        <div class="chart-box" id="bar-chart-container">
+            <h3>柱状图</h3>
+            <div id="bar-chart" class="chart"></div>
+        </div>
+        <div class="chart-box" id="pie-chart-container">
+            <h3>饼图</h3>
+            <div id="pie-chart" class="chart"></div>
+        </div>
+        <div class="chart-box" id="line-chart-container">
+            <h3>折线图</h3>
+            <div id="line-chart" class="chart"></div>
+        </div>
+        <div class="chart-box" id="scatter-chart-container">
+            <h3>散点图</h3>
+            <div id="scatter-chart" class="chart"></div>
+        </div>
+        <div class="chart-box" id="radar-chart-container">
+            <h3>雷达图</h3>
+            <div id="radar-chart" class="chart"></div>
+        </div>
+        <div class="chart-box" id="area-chart-container">
+            <h3>面积图</h3>
+            <div id="area-chart" class="chart"></div>
+        </div>
+        <div class="chart-box" id="sunburst-chart-container">
+            <h3>旭日图</h3>
+            <div id="sunburst-chart" class="chart"></div>
+        </div>
+    </div>
+
+    <script>
+        let workbook = null;
+        let sheetData = null;
+        let headers = [];
+        let selectedChartTypes = new Set();
+        
+        // 文件上传区域点击事件
+        document.getElementById('upload-area').addEventListener('click', function() {
+            document.getElementById('file-upload').click();
+        });
+        
+        // 拖放文件功能
+        const uploadArea = document.getElementById('upload-area');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#0b7dda';
+            uploadArea.style.backgroundColor = '#f0f8ff';
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#2196F3';
+            uploadArea.style.backgroundColor = 'white';
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#2196F3';
+            uploadArea.style.backgroundColor = 'white';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                    document.getElementById('file-upload').files = files;
+                    handleFileUpload(file);
+                } else {
+                    showError('请上传Excel文件 (.xlsx 或 .xls 格式)');
+                }
+            }
+        });
+        
+        // 文件上传处理
+        document.getElementById('file-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            handleFileUpload(file);
+        });
+        
+        function handleFileUpload(file) {
+            document.getElementById('file-name').textContent = '正在处理: ' + file.name;
+            document.getElementById('error-msg').style.display = 'none';
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    workbook = XLSX.read(data, { type: 'array', cellDates: true, cellNF: true, cellText: false });
+                    
+                    // 获取第一个工作表
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // 转换为JSON，保持所有数据类型
+                    sheetData = XLSX.utils.sheet_to_json(worksheet, { 
+                        header: 1, 
+                        raw: false,
+                        defval: ''
+                    });
+                    
+                    if (sheetData.length > 0) {
+                        // 过滤掉空行
+                        sheetData = sheetData.filter(row => row.some(cell => cell !== ''));
+                        
+                        if (sheetData.length > 0) {
+                            headers = sheetData[0].map((header, index) => {
+                                return header || `列 ${index+1}`;
+                            });
+                            
+                            // 更新步骤指示器
+                            document.querySelectorAll('.step')[0].classList.remove('active');
+                            document.querySelectorAll('.step')[1].classList.add('active');
+                            
+                            // 显示数据预览
+                            document.getElementById('data-preview').style.display = 'block';
+                            displayDataPreview(sheetData);
+                            
+                            // 显示图表选择区域
+                            document.getElementById('charts-options').style.display = 'block';
+                            document.getElementById('charts-options').scrollIntoView({ behavior: 'smooth' });
+                            
+                            // 显示明显的提示
+                            const notice = document.createElement('div');
+                            notice.className = 'flash-notice';
+                            notice.textContent = '👆 请选择您想要生成的图表类型';
+                            document.getElementById('charts-options').prepend(notice);
+                            
+                            // 闪烁动画，引起用户注意
+                            setTimeout(() => {
+                                if (document.querySelector('.flash-notice')) {
+                                    document.querySelector('.flash-notice').classList.add('flash');
+                                }
+                            }, 300);
+                            
+                            document.getElementById('file-name').textContent = '已上传: ' + file.name;
+                        } else {
+                            showError('Excel文件没有有效数据');
+                        }
+                    } else {
+                        showError('Excel文件没有数据');
+                    }
+                } catch (error) {
+                    console.error('解析Excel文件出错:', error);
+                    showError('解析Excel文件出错: ' + error.message);
+                }
+            };
+            reader.onerror = function() {
+                showError('读取文件出错');
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        function showError(message) {
+            const errorElement = document.getElementById('error-msg');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            document.getElementById('file-name').textContent = '处理失败';
+        }
+        
+        // 设置列选择器
+        function setupColumnSelector(headers) {
+            const categorySelect = document.getElementById('category-column');
+            const valueSelect = document.getElementById('value-column');
+            
+            categorySelect.innerHTML = '';
+            valueSelect.innerHTML = '';
+            
+            headers.forEach((header, index) => {
+                const categoryOption = document.createElement('option');
+                categoryOption.value = index;
+                categoryOption.textContent = header;
+                categorySelect.appendChild(categoryOption);
+                
+                const valueOption = document.createElement('option');
+                valueOption.value = index;
+                valueOption.textContent = header;
+                valueSelect.appendChild(valueOption);
+            });
+            
+            // 默认选择第一列作为类别，第二列作为数值
+            if (headers.length > 1) {
+                categorySelect.value = 0;
+                valueSelect.value = 1;
+            }
+        }
+        
+        // 显示数据预览
+        function displayDataPreview(data) {
+            const table = document.createElement('table');
+            const maxRows = Math.min(data.length, 10); // 限制预览行数
+            
+            for (let i = 0; i < maxRows; i++) {
+                const row = document.createElement('tr');
+                
+                // 创建单元格
+                for (let j = 0; j < data[i].length; j++) {
+                    const cell = i === 0 ? document.createElement('th') : document.createElement('td');
+                    cell.textContent = data[i][j];
+                    row.appendChild(cell);
+                }
+                
+                table.appendChild(row);
+            }
+            
+            const previewTable = document.getElementById('preview-table');
+            previewTable.innerHTML = '';
+            previewTable.appendChild(table);
+        }
+        
+        // 修改数据列验证和转换函数
+        function isNumeric(str) {
+            // 处理各种数字格式，包括整数、小数、科学计数法
+            if (str === null || str === undefined || str === '') return false;
+            
+            // 如果已经是数字类型，直接返回true
+            if (typeof str === 'number') return true;
+            
+            // 尝试转换字符串
+            str = String(str).trim();
+            
+            // 特殊处理百分比格式
+            if (str.endsWith('%')) {
+                str = str.slice(0, -1);
+            }
+            
+            // 处理Excel可能有的千位分隔符
+            str = str.replace(/,/g, '');
+            
+            // 允许小数点、负号和科学计数法
+            return !isNaN(parseFloat(str));
+        }
+        
+        // 添加按钮逻辑：确保永不禁用继续按钮
+        document.getElementById('continue-to-columns-btn').disabled = false;
+        
+        // 图表类型选择
+        document.querySelectorAll('.chart-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const chartType = this.getAttribute('data-type');
+                
+                if (this.classList.contains('selected')) {
+                    this.classList.remove('selected');
+                    selectedChartTypes.delete(chartType);
+                } else {
+                    this.classList.add('selected');
+                    selectedChartTypes.add(chartType);
+                }
+            });
+        });
+        
+        // 添加从图表选择到数据列选择的过渡按钮事件
+        document.getElementById('continue-to-columns-btn').addEventListener('click', function() {
+            if (selectedChartTypes.size === 0) {
+                alert('请至少选择一种图表类型');
+                return;
+            }
+            
+            // 更新步骤指示器
+            document.querySelectorAll('.step')[1].classList.remove('active');
+            document.querySelectorAll('.step')[2].classList.add('active');
+            
+            // 设置列选择器
+            setupColumnSelector(headers);
+            
+            // 饼图模式特殊处理
+            const onlyPieSelected = selectedChartTypes.size === 1 && selectedChartTypes.has('pie');
+            if (onlyPieSelected) {
+                document.getElementById('value-column-group').style.display = 'none';
+                document.getElementById('swap-axes-btn').style.display = 'none';
+                document.getElementById('category-label').textContent = '数据列（饼图数据）:';
+                document.querySelector('.selection-help').textContent = '饼图只需要选择一列数据，相同名称的数据将被自动合并。';
+            } else {
+                document.getElementById('value-column-group').style.display = 'block';
+                document.getElementById('swap-axes-btn').style.display = 'inline-block';
+                document.getElementById('category-label').textContent = 'X轴数据列（类别/名称）:';
+                document.querySelector('.selection-help').textContent = '请选择要用于图表的数据列。对于柱状图、折线图和散点图，需要选择X轴和Y轴的数据。';
+            }
+            
+            document.getElementById('column-selector').style.display = 'block';
+            document.getElementById('column-selector').scrollIntoView({ behavior: 'smooth' });
+            
+            // 闪烁动画提示
+            if (document.querySelector('.flash-notice')) {
+                document.querySelector('.flash-notice').remove();
+            }
+            
+            const notice = document.createElement('div');
+            notice.className = 'flash-notice';
+            notice.textContent = '👇 请选择数据列';
+            document.getElementById('column-selector').prepend(notice);
+            
+            // 闪烁动画，引起用户注意
+            setTimeout(() => {
+                if (document.querySelector('.flash-notice')) {
+                    document.querySelector('.flash-notice').classList.add('flash');
+                }
+            }, 300);
+        });
+        
+        // 生成图表按钮事件
+        document.getElementById('generate-btn').addEventListener('click', function() {
+            if (!sheetData || sheetData.length <= 1) {
+                showError('没有足够的数据进行分析');
+                return;
+            }
+            
+            const categoryIndex = parseInt(document.getElementById('category-column').value);
+            const valueIndex = parseInt(document.getElementById('value-column').value);
+            
+            // 验证是否可以从选定的列生成图表
+            const categories = [];
+            const values = [];
+            
+            // 从第二行开始（跳过表头）提取数据
+            for (let i = 1; i < sheetData.length; i++) {
+                const row = sheetData[i];
+                if (row.length > categoryIndex) {
+                    categories.push(row[categoryIndex] || `项目 ${i}`);
+                    
+                    // 饼图特殊处理（只需要一列数据）
+                    const onlyPieSelected = selectedChartTypes.size === 1 && selectedChartTypes.has('pie');
+                    if (onlyPieSelected) {
+                        // 对于饼图，我们使用类别列的数据作为值
+                        // 尝试提取数值，如果不是数字则使用1作为默认值（等份）
+                        const rawValue = row[categoryIndex];
+                        values.push(isNumeric(rawValue) ? parseFloat(rawValue) : 1);
+                    } else if (row.length > valueIndex) {
+                        // 对于其他图表，使用指定的值列
+                        values.push(row[valueIndex]);
+                    }
+                }
+            }
+            
+            // 改进数值检测，特别是对于Excel中的数字类型
+            const hasValidData = values.some(val => {
+                // 处理Excel可能输出的各种数字格式
+                if (val === null || val === undefined) return false;
+                return true; // 任何值都接受，后续会尝试转换
+            });
+            
+            if (!hasValidData || values.length === 0) {
+                showError('选择的数据列没有有效数据');
+                return;
+            }
+            
+            // 更新步骤指示器
+            document.querySelectorAll('.step')[2].classList.remove('active');
+            document.querySelectorAll('.step')[3].classList.add('active');
+            
+            // 隐藏所有图表容器
+            document.querySelectorAll('.chart-box').forEach(box => {
+                box.style.display = 'none';
+            });
+            
+            // 准备数据，转换数值
+            const numericValues = [];
+            for (let i = 0; i < values.length; i++) {
+                const rawValue = values[i];
+                // 更宽松的数值转换
+                let numValue;
+                try {
+                    numValue = typeof rawValue === 'number' ? rawValue : 
+                              isNumeric(rawValue) ? parseFloat(rawValue) : 
+                              (rawValue && typeof rawValue === 'string' && rawValue.trim() !== '') ? 1 : 0;
+                } catch (e) {
+                    numValue = 1; // 默认值
+                }
+                numericValues.push(numValue);
+            }
+            
+            // 根据选择生成图表
+            if (selectedChartTypes.has('bar')) {
+                document.getElementById('bar-chart-container').style.display = 'block';
+                generateBarChart(categories, numericValues);
+            }
+            
+            if (selectedChartTypes.has('pie')) {
+                document.getElementById('pie-chart-container').style.display = 'block';
+                
+                // 饼图特殊处理
+                const onlyPieSelected = selectedChartTypes.size === 1 && selectedChartTypes.has('pie');
+                if (onlyPieSelected) {
+                    // 使用类别作为名称，数值作为值
+                    generatePieChart(categories, numericValues);
+                } else {
+                    generatePieChart(categories, numericValues);
+                }
+            }
+            
+            if (selectedChartTypes.has('line')) {
+                document.getElementById('line-chart-container').style.display = 'block';
+                generateLineChart(categories, numericValues);
+            }
+            
+            if (selectedChartTypes.has('scatter')) {
+                document.getElementById('scatter-chart-container').style.display = 'block';
+                generateScatterChart(categories, numericValues);
+            }
+            
+            // 添加新图表类型的生成
+            if (selectedChartTypes.has('radar')) {
+                document.getElementById('radar-chart-container').style.display = 'block';
+                generateRadarChart(categories, numericValues);
+            }
+            
+            if (selectedChartTypes.has('area')) {
+                document.getElementById('area-chart-container').style.display = 'block';
+                generateAreaChart(categories, numericValues);
+            }
+            
+            if (selectedChartTypes.has('sunburst')) {
+                document.getElementById('sunburst-chart-container').style.display = 'block';
+                generateSunburstChart(categories, numericValues);
+            }
+            
+            // 滚动到图表区域
+            document.getElementById('charts-container').scrollIntoView({ behavior: 'smooth' });
+        });
+        
+        // 添加处理小数精度的函数
+        function fixPrecision(num) {
+            // 将数字转换为字符串，然后解析为浮点数，避免二进制表示精度问题
+            // 保留4位小数，避免类似0.1 + 0.2 != 0.3的问题
+            return parseFloat(parseFloat(num).toFixed(4));
+        }
+        
+        // 在合并相同类别数据时，修改累加逻辑，使用精确计算
+        function mergeData(categories, values) {
+            const dataMap = new Map();
+            for (let i = 0; i < categories.length; i++) {
+                const category = categories[i];
+                // 确保值是数字
+                const value = typeof values[i] === 'number' ? values[i] : parseFloat(values[i]) || 0;
+                
+                if (dataMap.has(category)) {
+                    // 使用精确计算累加值
+                    const currentValue = dataMap.get(category);
+                    dataMap.set(category, fixPrecision(currentValue + value));
+                } else {
+                    // 新类别，设置初始值
+                    dataMap.set(category, fixPrecision(value));
+                }
+            }
+            
+            // 将Map转换为所需的数据格式
+            const mergedCategories = [];
+            const mergedValues = [];
+            
+            dataMap.forEach((value, category) => {
+                mergedCategories.push(category);
+                mergedValues.push(value);
+            });
+            
+            return { categories: mergedCategories, values: mergedValues };
+        }
+        
+        // 生成柱状图
+        function generateBarChart(categories, values) {
+            const chartDom = document.getElementById('bar-chart');
+            const myChart = echarts.init(chartDom);
+            
+            // 使用修改后的函数合并数据
+            const mergedData = mergeData(categories, values);
+            const mergedCategories = mergedData.categories;
+            const mergedValues = mergedData.values;
+            
+            // 柱状图颜色设计
+            const colorList = [
+                '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de',
+                '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc', '#6e7074'
+            ];
+            
+            // 获取列标签作为轴名称
+            const categoryColumnIndex = parseInt(document.getElementById('category-column').value);
+            const valueColumnIndex = parseInt(document.getElementById('value-column').value);
+            const xAxisName = headers[categoryColumnIndex] || 'X轴';
+            const yAxisName = headers[valueColumnIndex] || 'Y轴';
+            
+            const option = {
+                title: {
+                    text: '数据分析结果',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 16
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    formatter: function(params) {
+                        const param = params[0];
+                        return `${param.name}: ${param.value} ${yAxisName}`;
+                    }
+                },
+                grid: {
+                    left: '5%',
+                    right: '10%',  // 增加右侧空间，为Y轴名称留出位置
+                    bottom: '10%',
+                    top: '15%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: mergedCategories,
+                    axisLabel: {
+                        rotate: 45,
+                        interval: 0,
+                        fontSize: 10,
+                        color: '#666'
+                    },
+                    axisTick: {
+                        alignWithLabel: true
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            color: '#ccc'
+                        }
+                    },
+                    name: xAxisName,
+                    nameLocation: 'end',  // 修改为末端显示
+                    nameGap: 5,
+                    nameTextStyle: {
+                        fontWeight: 'bold',
+                        fontSize: 12,
+                        align: 'right',
+                        verticalAlign: 'top'
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLine: {
+                        show: true,
+                        lineStyle: {
+                            color: '#ccc'
+                        }
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            type: 'dashed',
+                            color: '#eee'
+                        }
+                    },
+                    name: yAxisName,
+                    nameLocation: 'end',  // 修改为末端显示
+                    nameGap: 15,
+                    nameTextStyle: {
+                        fontWeight: 'bold',
+                        fontSize: 12,
+                        padding: [0, 0, 5, 0]  // 上右下左的内边距
+                    }
+                },
+                series: [{
+                    name: yAxisName,
+                    type: 'bar',
+                    data: mergedValues.map((value, index) => {
+                        return {
+                            value: value,
+                            itemStyle: {
+                                color: colorList[index % colorList.length]
+                            }
+                        };
+                    }),
+                    barWidth: '50%',
+                    itemStyle: {
+                        borderRadius: [5, 5, 0, 0]
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowOffsetX: 0,
+                            shadowColor: 'rgba(0,0,0,0.3)'
+                        }
+                    },
+                    label: {
+                        show: true,
+                        position: 'top',
+                        formatter: '{c}',
+                        fontSize: 10
+                    },
+                    showBackground: true,
+                    backgroundStyle: {
+                        color: 'rgba(180, 180, 180, 0.1)'
+                    }
+                }]
+            };
+            
+            myChart.setOption(option);
+            
+            // 窗口大小变化时重绘图表
+            window.addEventListener('resize', function() {
+                myChart.resize();
+            });
+        }
+        
+        // 生成饼图
+        function generatePieChart(categories, values) {
+            const chartDom = document.getElementById('pie-chart');
+            const myChart = echarts.init(chartDom);
+            
+            // 使用修改后的函数合并数据
+            const mergedData = mergeData(categories, values);
+            const mergedCategories = mergedData.categories;
+            const mergedValues = mergedData.values;
+            
+            // 将数据转换为饼图格式
+            const pieData = mergedCategories.map((name, index) => {
+                return { name, value: mergedValues[index] };
+            });
+            
+            // 获取列标签作为数据名称
+            const categoryColumnIndex = parseInt(document.getElementById('category-column').value);
+            const categoryName = headers[categoryColumnIndex] || '数据';
+            
+            const option = {
+                title: {
+                    text: '数据分析结果',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 16
+                    },
+                    subtext: `数据来源: ${categoryName}`
+                },
+                tooltip: {
+                    trigger: 'item',
+                    formatter: '{a} <br/>{b}: {c} ({d}%)'
+                },
+                legend: {
+                    orient: 'vertical',
+                    left: 'left',
+                    type: 'scroll'
+                },
+                series: [{
+                    name: categoryName,
+                    type: 'pie',
+                    radius: '60%',
+                    data: pieData,
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowOffsetX: 0,
+                            shadowColor: 'rgba(0, 0, 0, 0.5)'
+                        }
+                    },
+                    label: {
+                        formatter: '{b}: {c} ({d}%)'
+                    }
+                }]
+            };
+            
+            myChart.setOption(option);
+            
+            window.addEventListener('resize', function() {
+                myChart.resize();
+            });
+        }
+        
+        // 生成折线图
+        function generateLineChart(categories, values) {
+            const chartDom = document.getElementById('line-chart');
+            const myChart = echarts.init(chartDom);
+            
+            // 使用修改后的函数合并数据
+            const mergedData = mergeData(categories, values);
+            const mergedCategories = mergedData.categories;
+            const mergedValues = mergedData.values;
+            
+            // 获取列标签作为轴名称
+            const categoryColumnIndex = parseInt(document.getElementById('category-column').value);
+            const valueColumnIndex = parseInt(document.getElementById('value-column').value);
+            const xAxisName = headers[categoryColumnIndex] || 'X轴';
+            const yAxisName = headers[valueColumnIndex] || 'Y轴';
+            
+            const option = {
+                title: {
+                    text: '数据分析结果',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 16
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        const param = params[0];
+                        return `${param.name}: ${param.value} ${yAxisName}`;
+                    }
+                },
+                grid: {
+                    left: '5%',
+                    right: '10%',  // 增加右侧空间，为Y轴名称留出位置
+                    bottom: '10%',
+                    top: '15%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: mergedCategories,
+                    axisLabel: {
+                        rotate: 45,
+                        interval: 0,
+                        fontSize: 10
+                    },
+                    name: xAxisName,
+                    nameLocation: 'end',  // 修改为末端显示
+                    nameGap: 5,
+                    nameTextStyle: {
+                        fontWeight: 'bold',
+                        fontSize: 12,
+                        align: 'right',
+                        verticalAlign: 'top'
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: yAxisName,
+                    nameLocation: 'end',  // 修改为末端显示
+                    nameGap: 15,
+                    nameTextStyle: {
+                        fontWeight: 'bold',
+                        fontSize: 12,
+                        padding: [0, 0, 5, 0]  // 上右下左的内边距
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            type: 'dashed'
+                        }
+                    }
+                },
+                series: [{
+                    name: yAxisName,
+                    data: mergedValues,
+                    type: 'line',
+                    smooth: true,
+                    symbol: 'circle',
+                    symbolSize: 8,
+                    itemStyle: {
+                        color: '#5470c6'
+                    },
+                    lineStyle: {
+                        width: 3
+                    },
+                    areaStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0,
+                            y: 0,
+                            x2: 0,
+                            y2: 1,
+                            colorStops: [{
+                                offset: 0, color: 'rgba(84, 112, 198, 0.5)'
+                            }, {
+                                offset: 1, color: 'rgba(84, 112, 198, 0.1)'
+                            }]
+                        }
+                    }
+                }]
+            };
+            
+            myChart.setOption(option);
+            
+            window.addEventListener('resize', function() {
+                myChart.resize();
+            });
+        }
+        
+        // 生成散点图
+        function generateScatterChart(categories, values) {
+            const chartDom = document.getElementById('scatter-chart');
+            const myChart = echarts.init(chartDom);
+            
+            // 使用修改后的函数合并数据
+            const mergedData = mergeData(categories, values);
+            const mergedCategories = mergedData.categories;
+            const mergedValues = mergedData.values;
+            
+            // 获取列标签作为轴名称
+            const categoryColumnIndex = parseInt(document.getElementById('category-column').value);
+            const valueColumnIndex = parseInt(document.getElementById('value-column').value);
+            const xAxisName = headers[categoryColumnIndex] || 'X轴';
+            const yAxisName = headers[valueColumnIndex] || 'Y轴';
+            
+            // 将类别和值组合为散点图所需的数据格式
+            const scatterData = mergedCategories.map((cat, index) => {
+                return [index, mergedValues[index]]; // 使用索引作为X轴，值作为Y轴
+            });
+            
+            const option = {
+                title: {
+                    text: '数据分析结果',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 16
+                    }
+                },
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function(params) {
+                        const categoryIndex = params.value[0];
+                        return `${mergedCategories[categoryIndex]}: ${params.value[1]} ${yAxisName}`;
+                    }
+                },
+                grid: {
+                    left: '5%',
+                    right: '10%',  // 增加右侧空间，为Y轴名称留出位置
+                    bottom: '10%',
+                    top: '15%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: mergedCategories,
+                    axisLabel: {
+                        rotate: 45,
+                        interval: 0,
+                        fontSize: 10
+                    },
+                    name: xAxisName,
+                    nameLocation: 'end',  // 修改为末端显示
+                    nameGap: 5,
+                    nameTextStyle: {
+                        fontWeight: 'bold',
+                        fontSize: 12,
+                        align: 'right',
+                        verticalAlign: 'top'
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: yAxisName,
+                    nameLocation: 'end',  // 修改为末端显示
+                    nameGap: 15,
+                    nameTextStyle: {
+                        fontWeight: 'bold',
+                        fontSize: 12,
+                        padding: [0, 0, 5, 0]  // 上右下左的内边距
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            type: 'dashed'
+                        }
+                    }
+                },
+                series: [{
+                    type: 'scatter',
+                    name: yAxisName,
+                    data: scatterData,
+                    symbolSize: 12,
+                    itemStyle: {
+                        color: '#5470c6'
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(0, 0, 0, 0.3)'
+                        }
+                    }
+                }]
+            };
+            
+            myChart.setOption(option);
+            
+            window.addEventListener('resize', function() {
+                myChart.resize();
+            });
+        }
+        
+        // 生成雷达图
+        function generateRadarChart(categories, values) {
+            const chartDom = document.getElementById('radar-chart');
+            const myChart = echarts.init(chartDom);
+            
+            // 使用合并数据函数
+            const mergedData = mergeData(categories, values);
+            const mergedCategories = mergedData.categories;
+            const mergedValues = mergedData.values;
+            
+            // 获取列标签作为数据名称
+            const categoryColumnIndex = parseInt(document.getElementById('category-column').value);
+            const valueColumnIndex = parseInt(document.getElementById('value-column').value);
+            const xAxisName = headers[categoryColumnIndex] || 'X轴';
+            const yAxisName = headers[valueColumnIndex] || 'Y轴';
+            
+            // 准备雷达图数据
+            const indicator = mergedCategories.map((cat, index) => {
+                // 计算最大值以创建比例尺
+                const max = Math.max(...mergedValues) * 1.2; // 增加20%余量
+                return { name: cat, max: max };
+            });
+            
+            const option = {
+                title: {
+                    text: '数据分析结果 - 雷达图',
+                    left: 'center',
+                },
+                tooltip: {
+                    trigger: 'item'
+                },
+                legend: {
+                    data: [yAxisName],
+                    bottom: 0
+                },
+                radar: {
+                    indicator: indicator,
+                    radius: '60%',
+                    splitNumber: 5,
+                    axisName: {
+                        color: '#333',
+                        fontSize: 10,
+                        backgroundColor: '#eee',
+                        borderRadius: 3,
+                        padding: [3, 5]
+                    }
+                },
+                series: [{
+                    name: yAxisName,
+                    type: 'radar',
+                    data: [{
+                        value: mergedValues,
+                        name: yAxisName,
+                        symbol: 'circle',
+                        symbolSize: 6,
+                        lineStyle: {
+                            width: 2
+                        },
+                        areaStyle: {
+                            opacity: 0.3
+                        }
+                    }]
+                }]
+            };
+            
+            myChart.setOption(option);
+            
+            window.addEventListener('resize', function() {
+                myChart.resize();
+            });
+        }
+        
+        // 生成面积图
+        function generateAreaChart(categories, values) {
+            const chartDom = document.getElementById('area-chart');
+            const myChart = echarts.init(chartDom);
+            
+            // 使用合并数据函数
+            const mergedData = mergeData(categories, values);
+            const mergedCategories = mergedData.categories;
+            const mergedValues = mergedData.values;
+            
+            // 获取列标签作为轴名称
+            const categoryColumnIndex = parseInt(document.getElementById('category-column').value);
+            const valueColumnIndex = parseInt(document.getElementById('value-column').value);
+            const xAxisName = headers[categoryColumnIndex] || 'X轴';
+            const yAxisName = headers[valueColumnIndex] || 'Y轴';
+            
+            const option = {
+                title: {
+                    text: '数据分析结果 - 面积图',
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        label: {
+                            backgroundColor: '#6a7985'
+                        }
+                    }
+                },
+                legend: {
+                    data: [yAxisName],
+                    bottom: 0
+                },
+                grid: {
+                    left: '5%',
+                    right: '10%',
+                    bottom: '10%',
+                    top: '15%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: mergedCategories,
+                    name: xAxisName,
+                    nameLocation: 'end',
+                    nameGap: 5,
+                    nameTextStyle: {
+                        fontWeight: 'bold',
+                        fontSize: 12,
+                        align: 'right',
+                        verticalAlign: 'top'
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: yAxisName,
+                    nameLocation: 'end',
+                    nameGap: 15,
+                    nameTextStyle: {
+                        fontWeight: 'bold',
+                        fontSize: 12,
+                        padding: [0, 0, 5, 0]
+                    }
+                },
+                series: [{
+                    name: yAxisName,
+                    type: 'line',
+                    stack: 'Total',
+                    areaStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0,
+                            y: 0,
+                            x2: 0,
+                            y2: 1,
+                            colorStops: [{
+                                offset: 0, color: 'rgba(58, 71, 212, 0.8)'
+                            }, {
+                                offset: 1, color: 'rgba(58, 71, 212, 0.1)'
+                            }]
+                        }
+                    },
+                    emphasis: {
+                        focus: 'series'
+                    },
+                    data: mergedValues,
+                    smooth: true,
+                    symbol: 'circle',
+                    symbolSize: 6,
+                    lineStyle: {
+                        width: 3,
+                        color: '#3a47d4'
+                    },
+                    itemStyle: {
+                        color: '#3a47d4'
+                    }
+                }]
+            };
+            
+            myChart.setOption(option);
+            
+            window.addEventListener('resize', function() {
+                myChart.resize();
+            });
+        }
+        
+        // 生成旭日图
+        function generateSunburstChart(categories, values) {
+            const chartDom = document.getElementById('sunburst-chart');
+            const myChart = echarts.init(chartDom);
+            
+            // 使用合并数据函数
+            const mergedData = mergeData(categories, values);
+            const mergedCategories = mergedData.categories;
+            const mergedValues = mergedData.values;
+            
+            // 获取列标签作为数据名称
+            const categoryColumnIndex = parseInt(document.getElementById('category-column').value);
+            const valueColumnIndex = parseInt(document.getElementById('value-column').value);
+            const categoryName = headers[categoryColumnIndex] || '类别';
+            const valueName = headers[valueColumnIndex] || '数值';
+            
+            // 准备旭日图数据
+            const sunburstData = [];
+            
+            // 所有数据的总和，用于计算百分比
+            const totalValue = mergedValues.reduce((a, b) => a + b, 0);
+            
+            // 第一级数据 - 主要类别（根据第一个字符或其他规则分组）
+            const mainGroups = {};
+            
+            mergedCategories.forEach((cat, index) => {
+                // 简单规则：根据首字母或数字分组
+                const groupKey = cat.charAt(0).toUpperCase();
+                
+                if (!mainGroups[groupKey]) {
+                    mainGroups[groupKey] = {
+                        name: `${groupKey}组`,
+                        value: 0,
+                        children: []
+                    };
+                    sunburstData.push(mainGroups[groupKey]);
+                }
+                
+                // 添加子项
+                mainGroups[groupKey].children.push({
+                    name: cat,
+                    value: mergedValues[index]
+                });
+                
+                // 更新组总值
+                mainGroups[groupKey].value += mergedValues[index];
+            });
+            
+            const option = {
+                title: {
+                    text: '数据分析结果 - 旭日图',
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function (params) {
+                        const percent = ((params.value / totalValue) * 100).toFixed(1);
+                        return `${params.name}: ${params.value} (${percent}%)`;
+                    }
+                },
+                series: {
+                    type: 'sunburst',
+                    data: sunburstData,
+                    radius: ['15%', '80%'],
+                    label: {
+                        rotate: 'radial'
+                    },
+                    levels: [
+                        {}, // 空对象表示使用系列的默认设置
+                        {
+                            r0: '15%',
+                            r: '40%',
+                            itemStyle: {
+                                borderWidth: 2
+                            },
+                            label: {
+                                rotate: 'tangential'
+                            }
+                        },
+                        {
+                            r0: '40%',
+                            r: '80%',
+                            label: {
+                                align: 'right'
+                            }
+                        }
+                    ]
+                }
+            };
+            
+            myChart.setOption(option);
+            
+            window.addEventListener('resize', function() {
+                myChart.resize();
+            });
+        }
+        
+        // 添加交换X轴和Y轴的功能
+        document.getElementById('swap-axes-btn').addEventListener('click', function() {
+            const categorySelect = document.getElementById('category-column');
+            const valueSelect = document.getElementById('value-column');
+            
+            // 保存当前选择的值
+            const categoryValue = categorySelect.value;
+            const valueValue = valueSelect.value;
+            
+            // 交换值
+            categorySelect.value = valueValue;
+            valueSelect.value = categoryValue;
+            
+            // 添加动画效果
+            this.classList.add('active');
+            setTimeout(() => {
+                this.classList.remove('active');
+            }, 300);
+        });
+    </script>
+</body>
+</html>
